@@ -34,7 +34,7 @@ export default function DashboardPage() {
 			<p className="text-sm font-bold text-indigo-600">
 				OVERVIEW
 			</p>
-			<h1 className="mt-1 text-3x1 font-black tracking-tight">
+			<h1 className="mt-1 text-3xl font-black tracking-tight">
 				Dashboard
 			</h1>
 			<p className="mt-2 text-sm text-slate-500">
