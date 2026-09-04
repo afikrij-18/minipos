@@ -21,9 +21,18 @@ const defaultValues: ProductInput = {
   stock: 0,
 };
 
+
+
+
 export function ProductForm({initialValues = defaultValues, submitLabel = "Simpan Produk", onSubmit}: ProductFormProps){
   const [values, setValues] = 
-    useState<ProductInput>(initialValues);
+    useState<ProductInput>({
+      name: initialValues?.name ?? "",
+      sku: initialValues?.sku ?? "",
+      price: initialValues?.price ?? "",
+      stock: initialValues?.stock ?? "",
+    });
+    
   function updateField(
     field: keyof ProductInput,
     value: string

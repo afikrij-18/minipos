@@ -2,9 +2,9 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { ProductForm } from "@/components/products/product-form";
-// import { addProduct } from "@/utils/product-storage";
 import { ProductInput } from "@/types/product";
-import { addProduct } from "@/utils/product-storage";
+import { addProduct, getProducts } from "@/utils/product-storage";
+import { deleteProduct } from "@/lib/product-storage";
 
 
 export default function CreateProductPage() {
@@ -30,4 +30,6 @@ export default function CreateProductPage() {
       </div>
     </div>
   );
+
 }
+

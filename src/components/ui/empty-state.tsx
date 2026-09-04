@@ -1,4 +1,7 @@
+import Link from 'next/link';
 import React from 'react'
+import { Button } from './Button';
+import { Plus } from 'lucide-react';
 
 export function EmptyState({
     title, 
@@ -13,8 +16,15 @@ export function EmptyState({
             {title}
         </h3>
     <p className='mt-2 text-sm text-slate-500'>
-        {description}
+        {description}        
         </p> 
+    <Link href="/products/create">
+          <Button className="w-full sm:w-auto">
+            <Plus size={18} />
+            Tambah Produk
+          </Button>
+        </Link>
+    
     </div>
   );
 }

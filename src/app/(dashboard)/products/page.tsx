@@ -1,44 +1,34 @@
 "use client";
 
-import Link from "next/link";
-import { Plus,Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import type { Product } from "@/types/product";
-import { formatCurrency } from "@/utils/currency";
+import { EmptyState } from "@/components/ui/empty-state";
+import { deleteProduct } from "@/lib/product-storage";
 import { getProducts } from "@/utils/product-storage";
-
-const sampleProducts: Product[] = [
-  {
-    id:"1",
-    name: "Kopi Susu",
-    sku: "KOPI001",
-    price: 18000,
-    stock: 10,
-  },
-  {
-    id:"2",
-    name: "Teh Manis",
-    sku: "TEH001",
-    price: 8000,
-    stock: 5,
-  },
-  {
-    id:"3",
-    name: "Roti Bakar",
-    sku: "ROTI001",
-    price: 15000,
-    stock: 3,
-  },
-]
+import { Plus,Search } from "lucide-react";
+import { formatCurrency } from "@/utils/currency";
+import type { Product } from "@/types/product";
+import {Pencil, Trash2} from "lucide-react";
 
 
 export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+
+function handleDelete(id: string) {
+  const confirmed = window.confirm(
+    "Yakin ingin menghapis produk ini?"
+  );
+  if (!confirmed) {
+    return;
+  }
+  deleteProduct(id);
+
+  const latestProducts = getProducts();
+  setProducts(latestProducts);
+}
 
   useEffect(() => {
     setProducts(getProducts());
@@ -132,7 +122,7 @@ export default function ProductsPage() {
                         <Link href={"/products/" +product.id + "/edit"} className="rounded-lg border px-3 py-2 text-sm text-slate-600 font-semibold hover:bg-slate-200 duration-200">
                         Edit
                         </Link>
-                        <button className=" rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 font-semibold cursor-pointer hover:bg-red-200 duration-200 ">
+                        <button onClick={() => handleDelete(product.id)} className=" rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 font-semibold cursor-pointer hover:bg-red-200 duration-200 ">
                           Hapus
                         </button>
                       </div>
@@ -151,16 +141,17 @@ export default function ProductsPage() {
         </div>
       )}
 
-  {sampleProducts.length === 0 && (
+  {products.length === 0 && (
     <EmptyState 
     title="Belum ada produk"
     description="Tambahkan produk pertama untuk memulai transaksi POS."
     />
   )}
-   {sampleProducts.length > 0 && filtered.length === 0 && (
+   {products.length > 0 && filtered.length === 0 && (
     <div className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500">
       <Search className="mx-auto mb-2" />
       Produk tidak ditemukan.
+      
     </div>
    )
 
