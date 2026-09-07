@@ -3,15 +3,15 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { ProductForm } from "@/components/products/product-form";
 import { ProductInput } from "@/types/product";
-import { addProduct, getProducts } from "@/utils/product-storage";
-import { deleteProduct } from "@/lib/product-storage";
+import { addProduct, getProducts } from "@/services/product.service";
+
 
 
 export default function CreateProductPage() {
   const router = useRouter();
 
-    function handleCreateProduct(value: ProductInput) {
-      addProduct(value);
+    async function handleSubmit(value: ProductInput) {
+      await addProduct(value);
       router.push("/products");
     }
   return (
@@ -26,7 +26,7 @@ export default function CreateProductPage() {
         Isi data produk yang akan dijual di MiniPOS.
     </p>
       <div className="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
-        <ProductForm onSubmit={handleCreateProduct} />
+        <ProductForm onSubmit={handleSubmit} />
       </div>
     </div>
   );

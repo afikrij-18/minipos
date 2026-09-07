@@ -5,33 +5,53 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
-import { deleteProduct } from "@/lib/product-storage";
-import { getProducts } from "@/utils/product-storage";
+import { deleteProduct } from "@/services/product.service";
+// import { getProducts } from "@/utils/product-storage";
 import { Plus,Search } from "lucide-react";
 import { formatCurrency } from "@/utils/currency";
 import type { Product } from "@/types/product";
 import {Pencil, Trash2} from "lucide-react";
-
+import { getProducts } from "@/services/product.service";
 
 export default function ProductsPage() {
+
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  // const [keyword, setKeyword] = useState(" ");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-function handleDelete(id: string) {
+  async function loadProducts() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await getProducts();
+
+      setProducts(data);
+    }
+    catch (error) {
+      console.error(error);
+      setError("Gagal memuat produk.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+async function handleDelete(id: string) {
   const confirmed = window.confirm(
     "Yakin ingin menghapis produk ini?"
   );
-  if (!confirmed) {
-    return;
-  }
-  deleteProduct(id);
 
-  const latestProducts = getProducts();
-  setProducts(latestProducts);
+  if (!confirmed)  return;
+  
+  await deleteProduct(id);
+
+  await loadProducts();  
 }
 
   useEffect(() => {
-    setProducts(getProducts());
+    loadProducts();
   }, []);
 
   const filtered = useMemo(() => {
@@ -41,9 +61,27 @@ function handleDelete(id: string) {
       product.name.toLowerCase().includes(keyword) ||
       product.sku.toLowerCase().includes(keyword) 
 );
-
   }, [products, search]);
 
+useEffect(() => {
+    loadProducts();
+  }, []);
+
+  if(loading) {
+    return (
+      <div className="rounded-2xl border bg-white p6">
+        Memuat data produk..
+      </div>
+    )
+  }
+
+  if(error) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+        {error}
+      </div>      
+    )
+  }
   return (
   
     <div>

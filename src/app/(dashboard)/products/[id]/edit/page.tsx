@@ -1,7 +1,7 @@
 "use client";
 
 import { ProductForm } from "@/components/products/product-form";
-import { getProductByid, updateProduct } from "@/lib/product-storage";
+import { getProductByid, updateProduct } from "@/services/product.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -17,26 +17,37 @@ export default function EditProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function handleSubmit(input: ProductInput) {
+     if (!product) return;
+   await updateProduct(product.id, input); 
+   router.push ("/products");
+ }
+  // useEffect(() => {
+  //   const selectedProduct = getProductByid(params.id);
+
+  //   setProduct(selectedProduct);
+  //   setLoading(false);
+  // }, [params.id]);
+  
+  
+  
   useEffect(() => {
-    const selectedProduct = getProductByid(params.id);
-
-    setProduct(selectedProduct);
+    async function loadDataProduct() {
+      const data = await getProductByid(params.id);
+      setProduct(data ?? null);
+    }
+    loadDataProduct();
     setLoading(false);
-  }, [params.id]);
-
+  },[params.id]);
+  
+  
   if(loading) {
-    return <p>Mmemuat produk ...</p>;
+    return <p>Memuat produk ...</p>;
   }
   if (!product) {
     return <p>Produk tidak ditemukan.</p>
   }
-
-  function handleSubmit(input: ProductInput) {
-    if (!product) return
-  updateProduct(product.id, input);
-
-  router.push ("/products");
-}
+  
 return (
   <div>
     <p className="text-sm font-bold text-indigo-600">
