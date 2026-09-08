@@ -156,14 +156,15 @@ useEffect(() => {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex justify-center gap-2">
-                        <Link href={"/products/" +product.id + "/edit"} className="rounded-lg border px-3 py-2 text-sm text-slate-600 font-semibold hover:bg-slate-200 duration-200">
-                        Edit
-                        </Link>
-                        <button onClick={() => handleDelete(product.id)} className=" rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 font-semibold cursor-pointer hover:bg-red-200 duration-200 ">
-                          Hapus
-                        </button>
-                      </div>
+                      
+                        <div className="flex justify-center gap-2">
+                          <Link href={"/products/" +product.id + "/edit"} className="rounded-lg border px-3 py-2 text-sm text-slate-600 font-semibold hover:bg-slate-200 duration-200">
+                          <div className="flex gap-1.5 items-center"><Pencil size={15}/>Edit</div>
+                          </Link>
+                          <button onClick={() => handleDelete(product.id)} className=" rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 font-semibold cursor-pointer hover:bg-red-200 duration-200 ">
+                            <div className="flex gap-1.5 items-center"><Trash2 size={16}/> Hapus</div>
+                          </button>
+                        </div>
                     </td>
                   </tr>
                 )
