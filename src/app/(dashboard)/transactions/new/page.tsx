@@ -187,7 +187,7 @@ export default function NewTransactionPage() {
   }
 />
 
-<select className="text-right"
+<select className="text-right text-slate-800 bg-amber-50 rounded-2xl"
   value={paymentMethod}
   onChange={(event) =>
     setPaymentMethod(event.target.value as PaymentMethod)
