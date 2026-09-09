@@ -3,19 +3,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 
+import { useRouter } from "next/navigation";
+import { createTransaction } from "@/services/transaction.service";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/input";
 import { getProducts } from "@/services/product.service";
 import type { Product } from "@/types/product";
 import type { CartItem, PaymentMethod } from "@/types/carts";
 import { formatRupiah } from "@/utils/format";
+import { TransactionItem } from "@/types/transaction";
 
 export default function NewTransactionPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  // gemini paidAmount dan setPaidAmount
+  const [paidAmount, setPaidAmount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const subtotal = useMemo(() => {
     return cartItems.reduce((total, item) => total + item.subtotal, 0);
@@ -84,23 +90,22 @@ export default function NewTransactionPage() {
     );
   }
 
-  function handleCheckout() {
-  if (cartItems.length === 0) {
-    alert("Keranjang masih kosong");
-    return;
+  async function handleCheckout() {
+    const transactionItems: TransactionItem[] = cartItems.map((item) => ({
+      productId: item.productId,
+      productName: item.name,
+      price: item.price,
+      quantity: item.qty,
+      subtotal: item.subtotal,
+    }));
+    const transactionId = await createTransaction({
+      items: transactionItems,
+      total: grandTotal,
+      paidAmount,
+      paymentMethod,
+    });
+    router.push("/transactions/" + transactionId);
   }
-
-  const payload = {
-    items: cartItems,
-    subtotal,
-    discount,
-    grandTotal,
-    paymentMethod,
-  };
-
-  console.log("checkout payload", payload);
-  alert("Checkout berhasil disiapkan. Lihat console.");
-}
 
   useEffect(() => {
     async function loadProducts() {
@@ -131,81 +136,83 @@ export default function NewTransactionPage() {
           </div>
 
           <Button onClick={() => handleAddToCart(product)}>Tambah</Button>
-                    
         </div>
       ))}
       {cartItems.length === 0 ? (
-  <div className="rounded-2xl border border-dashed p-8 text-center">
-    <ShoppingCart className="mx-auto text-slate-700" />
+        <div className="rounded-2xl border border-dashed p-8 text-center">
+          <ShoppingCart className="mx-auto text-slate-700" />
 
-    <h3 className="mt-4 font-bold">
-      Keranjang masih kosong
-    </h3>
+          <h3 className="mt-4 font-bold">Keranjang masih kosong</h3>
 
-    <p className="mt-1 text-sm text-slate-500">
-      Pilih produk dari daftar di sebelah kiri.
-    </p>
-  </div>
-) : (
-  <div>Render cart items</div>
-)}
-{cartItems.map((item) => (
-  <div key={item.productId} className="rounded-2xl border bg-white p-4">
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <h3 className="font-bold text-slate-700">{item.name}</h3>
-        
-        <p className="text-sm text-slate-900">
-          {formatRupiah(item.price)} x {item.qty}
-        </p>        
+          <p className="mt-1 text-sm text-slate-500">
+            Pilih produk dari daftar di sebelah kiri.
+          </p>
+        </div>
+      ) : (
+        <div className="text-center font-semibold">
+          Isi Keranjang
+        </div>
+      )}
+      {cartItems.map((item) => (
+        <div key={item.productId} className="rounded-2xl border bg-white p-4">
+          <div className="flex items-cemter justify-between gap-4">
+            <div className="flex flex-1 items-center gap-4">
+              <h3 className="font-bold text-slate-700">{item.name}</h3>
+              <p className="text-sm text-slate-900">
+                {formatRupiah(item.price)} x {item.qty}
+              </p>
+            </div>
+            <Input
+              type="number"
+              min={1}
+              value={item.qty}
+              onChange={(event) =>
+                handleUpdateQty(item.productId, Number(event.target.value))
+              }
+              className="flex-1 max-w-xs"
+            />
+
+            <button
+              className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 font-semibold cursor-pointer hover:bg-red-200 duration-200"
+              onClick={() => handleRemoveItem(item.productId)}
+            >
+              Hapus
+            </button>
+          </div>
+        </div>
+      ))}
+      <div className="flex items-center justify-between  gap-4">
+        <h1 className="font-semibold  p-2 rounded-md ">Diskon</h1>
+        <Input
+          type="number"
+          min={0}
+          value={discount}
+          onChange={(event) => setDiscount(Number(event.target.value))}
+        />
       </div>
-      
-      <button className="cursor-pointer text-slate-900 font-bold" onClick={() => handleRemoveItem(item.productId)}>
-        Hapus
-      </button>
-    </div>
-    <Input
-  type="number"
-  min={1}
-  value={item.qty}
-  onChange={(event) =>
-    handleUpdateQty(
-      item.productId,
-      Number(event.target.value)
-    )
-  }
-/>
-  </div>
-   
-))}
-<Input
-  type="number"
-  min={0}
-  value={discount}
-  onChange={(event) =>
-    setDiscount(Number(event.target.value))
-  }
-/>
+      <div className="flex justify-between">
+        <p>Metode Pembayaran</p>
+        <select
+          className="text-right text-slate-800 bg-amber-50"
+          value={paymentMethod}
+          onChange={(event) =>
+            setPaymentMethod(event.target.value as PaymentMethod)
+          }
+        >
+          <option value="cash">Cash</option>
+          <option value="transfer">Transfer</option>
+          <option value="qris">QRIS</option>
+        </select>
+      </div>
 
-<select className="text-right text-slate-800 bg-amber-50 rounded-2xl"
-  value={paymentMethod}
-  onChange={(event) =>
-    setPaymentMethod(event.target.value as PaymentMethod)
-  }
->
-  <option value="cash">Cash</option>
-  <option value="transfer">Transfer</option>
-  <option value="qris">QRIS</option>
-</select>
-<Button
-  type="button"
-  disabled={cartItems.length === 0}
-  onClick={handleCheckout}
-  className="w-full"
->
-  Checkout
-</Button>
+      <Button
+        type="button"
+        disabled={cartItems.length === 0}
+        onClick={handleCheckout}
+        className="w-full"
+      >
+        Checkout
+      </Button>
     </div>
-    
   );
 }
