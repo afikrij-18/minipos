@@ -17,7 +17,7 @@ import {
 
 
 
-  const DEMO_USER_ID = "demo-user";
+  export const DEMO_USER_ID = "demo-user";
   function productCollection(){
     return collection(
       db, "users",

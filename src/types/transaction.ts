@@ -12,10 +12,12 @@ export type PaymentMethod =
 | "transfer";
 
 export type Transaction = {
+  changeAmount : number;
   id: string;
   invoiceNumber: string;
   items: TransactionItem[];
   total: number;
+  discount?: number;
   paidAmount: number;
   paymentMethod: PaymentMethod;
   createdAt: Date;
