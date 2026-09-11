@@ -9,18 +9,21 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Search, Eye, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function TransactionPage() {
   const [search, setSearch] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { user } = useAuth();
 
   async function loadTransactions() {
     try {
+      if (!user) return;
       setLoading(true);
       setError("");
-      const data = await getTransactions();
+      const data = await getTransactions(user.uid);
       setTransactions(data as Transaction[]);
     } catch (err) {
       console.error(err);

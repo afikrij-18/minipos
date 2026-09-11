@@ -12,6 +12,7 @@ import type { Product } from "@/types/product";
 import type { CartItem, PaymentMethod } from "@/types/carts";
 import { formatRupiah } from "@/utils/format";
 import { TransactionItem } from "@/types/transaction";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function NewTransactionPage() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function NewTransactionPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const subtotal = useMemo(() => {
     return cartItems.reduce((total, item) => total + item.subtotal, 0);
@@ -115,6 +117,7 @@ export default function NewTransactionPage() {
   }
 
   async function handleCheckout() {
+    if (!user) return;
     const transactionItems: TransactionItem[] = cartItems.map((item) => ({
       productId: item.productId,
       productName: item.name,
@@ -122,21 +125,24 @@ export default function NewTransactionPage() {
       quantity: item.qty,
       subtotal: item.subtotal,
     }));
-    const transactionId = await createTransaction({
+    const transactionId = await createTransaction(user.uid, {
       items: transactionItems,
       total: grandTotal,
       paidAmount,
       paymentMethod,
     });
+    console.log(transactionId)
     router.push("/transactions/" + transactionId);
   }
 
   useEffect(() => {
+   
     async function loadProducts() {
       try {
+         if (!user) return;
         setLoading(true);
 
-        const data = await getProducts();
+        const data = await getProducts(user.uid);
         setProducts(data);
       } finally {
         setLoading(false);

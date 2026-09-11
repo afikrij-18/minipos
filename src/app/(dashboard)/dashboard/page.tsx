@@ -13,6 +13,7 @@ import { formatCurrency } from "@/utils/currency";
 
 import type { Product } from "@/types/product";
 import type { Transaction } from "@/types/transaction";
+import { useAuth } from "@/contexts/auth-context";
 
 const LOW_STOCK_LIMIT = 5;
 
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { user } = useAuth();
 
   // Pilih transaksi hari ini
   const todayTransactions = useMemo(() => {
@@ -71,12 +73,14 @@ export default function DashboardPage() {
 
   async function loadDashboardData() {
     try {
+      // memastikan ada data user
+      if (!user) return;
       setLoading(true);
       setError("");
 
       const [productData, transactionData] = await Promise.all([
-        getProducts(),
-        getTransactions(),
+        getProducts(user.uid),
+        getTransactions(user.uid),
       ]);
       setProducts(productData);
       setTransactions(transactionData as Transaction[]);

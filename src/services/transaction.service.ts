@@ -12,9 +12,12 @@ import {
 
 import { db } from "@/lib/firebase";
 import type { TransactionItem, PaymentMethod, Transaction } from "@/types/transaction";
-import { DEMO_USER_ID } from "./product.service";
+// import { DEMO_USER_ID } from "./product.service";
 
-const transactionCollection = collection(db, "transactions");
+const transactionCollection = (uid:string) => {
+  return collection(db, "users", uid, "transactions");
+  
+} 
 
 type CreateTransactionPayload = {
   items: TransactionItem[];
@@ -27,12 +30,11 @@ function generateInvoiceNumber() {
   return `TRX-${Date.now()}`;
 }
 
-export const createTransaction = async (
-  payload: CreateTransactionPayload,
+export const createTransaction = async (uid: string, payload: CreateTransactionPayload,
 ) => {
   const changeAmount = payload.paidAmount - payload.total;
 
-  const transactionRef = doc(transactionCollection);
+  const transactionRef = doc(transactionCollection(uid));
 
   await runTransaction(db, async (transaction) => {
     const products: {
@@ -47,7 +49,7 @@ export const createTransaction = async (
       const productRef = doc(
         db,
         "users",
-        DEMO_USER_ID,
+        uid,
         "products",
         item.productId
       );
@@ -101,8 +103,8 @@ export const createTransaction = async (
 };
 
 // Tambahkan return type Promise<Transaction[]>
-export async function getTransactions(): Promise<Transaction[]> {
-  const q = query(transactionCollection, orderBy("createdAt", "desc"));
+export async function getTransactions(uid: string): Promise<Transaction[]> {
+  const q = query(transactionCollection(uid), orderBy("createdAt", "desc"));
 
   const snapshot = await getDocs(q);
 
@@ -118,8 +120,8 @@ export async function getTransactions(): Promise<Transaction[]> {
 }
 
 // Tambahkan return type Promise<Transaction | null>
-export async function getTransactionsById(id: string): Promise<Transaction | null> {
-  const docRef = doc(db, "transactions", id);
+export async function getTransactionsById(uid: string, transactionId: string): Promise<Transaction | null> {
+  const docRef = doc(db, "users", uid, "transactions",transactionId );
   const snapshot = await getDoc(docRef);
 
   if (!snapshot.exists()) {

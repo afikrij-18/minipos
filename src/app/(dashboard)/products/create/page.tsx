@@ -4,14 +4,17 @@ import { useRouter } from "next/navigation";
 import { ProductForm } from "@/components/products/product-form";
 import { ProductInput } from "@/types/product";
 import { addProduct, getProducts } from "@/services/product.service";
+import { useAuth } from "@/contexts/auth-context";
 
 
 
 export default function CreateProductPage() {
   const router = useRouter();
+  const { user } = useAuth();
 
     async function handleSubmit(value: ProductInput) {
-      await addProduct(value);
+      if (!user) return;
+      await addProduct(user.uid,value);
       router.push("/products");
     }
   return (

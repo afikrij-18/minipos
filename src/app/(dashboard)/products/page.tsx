@@ -12,6 +12,7 @@ import { formatCurrency } from "@/utils/currency";
 import type { Product } from "@/types/product";
 import { Pencil, Trash2 } from "lucide-react";
 import { getProducts } from "@/services/product.service";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function ProductsPage() {
   const [search, setSearch] = useState("");
@@ -19,13 +20,16 @@ export default function ProductsPage() {
   // const [keyword, setKeyword] = useState(" ");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { user } = useAuth();
 
   async function loadProducts() {
     try {
+      if (!user) return;
       setLoading(true);
       setError("");
 
-      const data = await getProducts();
+      const data = await getProducts(user.uid);
+      console.log(data)
 
       setProducts(data);
     } catch (error) {
@@ -37,11 +41,13 @@ export default function ProductsPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!user) return;
+    
     const confirmed = window.confirm("Yakin ingin menghapis produk ini?");
 
     if (!confirmed) return;
 
-    await deleteProduct(id);
+    await deleteProduct(user.uid, id);
 
     await loadProducts();
   }

@@ -1,20 +1,24 @@
-import { notFound } from "next/navigation";
+"use client";
+import { notFound, useParams } from "next/navigation";
 import { getTransactionsById } from "@/services/transaction.service";
 import { formatRupiah } from "@/utils/format";
 import PrintButton from "@/components/transactions/print-button";
+import { useAuth } from "@/contexts/auth-context";
+import { use } from "react";
 
-type PageProps = {
-  params: Promise<{ id: string }>;
-};
 
-export default async function TransactionDetailPage({ params }: PageProps) {
-  const { id } = await params;
 
-  if (!id) {
+export default  function TransactionDetailPage() {
+  const params = useParams<{id: string}>();
+  const { user } = useAuth();
+
+  if (!params.id) {
     notFound();
   }
 
-  const transaction = await getTransactionsById(id);
+  if (!user) return;
+
+  const transaction = getTransactionsById(user.uid, params.id);
 
   if (!transaction) {
     notFound();
