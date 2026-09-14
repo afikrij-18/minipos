@@ -1,285 +1,312 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { ShoppingCart } from "lucide-react";
-
+import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createTransaction } from "@/services/transaction.service";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/input";
-import { getProducts } from "@/services/product.service";
-import type { Product } from "@/types/product";
-import type { CartItem, PaymentMethod } from "@/types/carts";
-import { formatRupiah } from "@/utils/format";
-import { TransactionItem } from "@/types/transaction";
 import { useAuth } from "@/contexts/auth-context";
+import { getProducts } from "@/services/product.service";
+import { checkout } from "@/services/transaction.service";
+import type { Product } from "@/types/product";
+import type { CartItem, PaymentMethod } from "@/types/transaction";
+import { formatCurrency } from "@/utils/currency";
 
 export default function NewTransactionPage() {
   const router = useRouter();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [discount, setDiscount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [paidAmount, setPaidAmount] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const subtotal = useMemo(() => {
-    return cartItems.reduce((total, item) => total + item.subtotal, 0);
-  }, [cartItems]);
+  const loadProducts = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      setProducts(await getProducts(user.uid));
+    } catch {
+      setError("Gagal mengambil produk.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
-  const grandTotal = useMemo(() => {
-    return Math.max(subtotal - discount, 0);
-  }, [subtotal, discount]);
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts]);
 
-  // Kalkulasi sisa stok otomatis (Stok Produk - Qty di Keranjang)
-  const availableStockMap = useMemo(() => {
-    const map = new Map<string, number>();
-    products.forEach((product) => {
-      const inCart =
-        cartItems.find((item) => item.productId === product.id)?.qty || 0;
-      map.set(product.id, Math.max(product.stock - inCart, 0));
-    });
-    return map;
-  }, [products, cartItems]);
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const keyword = search.toLowerCase();
-
-      return (
+  const filtered = useMemo(() => {
+    const keyword = search.toLowerCase();
+    return products.filter(
+      (product) =>
         product.name.toLowerCase().includes(keyword) ||
-        product.sku.toLowerCase().includes(keyword)
-      );
-    });
+        product.sku.toLowerCase().includes(keyword),
+    );
   }, [products, search]);
 
-  function handleAddToCart(product: Product) {
-    const currentStock = availableStockMap.get(product.id) ?? 0;
-    if (currentStock <= 0) return;
+  const total = useMemo(
+    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cart],
+  );
+  const change =
+    paymentMethod === "cash" ? Math.max(paymentAmount - total, 0) : 0;
 
-    setCartItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (item) => item.productId === product.id,
-      );
-
-      if (existingItem) {
-        return currentItems.map((item) =>
+  function addToCart(product: Product) {
+    if (product.stock <= 0) return;
+    setCart((current) => {
+      const existing = current.find((item) => item.productId === product.id);
+      if (existing) {
+        if (existing.quantity >= product.stock) return current;
+        return current.map((item) =>
           item.productId === product.id
-            ? {
-                ...item,
-                qty: item.qty + 1,
-                subtotal: (item.qty + 1) * item.price,
-              }
+            ? { ...item, quantity: item.quantity + 1 }
             : item,
         );
       }
-
       return [
-        ...currentItems,
+        ...current,
         {
           productId: product.id,
           name: product.name,
+          sku: product.sku,
           price: product.price,
-          qty: 1,
-          subtotal: product.price,
+          quantity: 1,
+          stock: product.stock,
         },
       ];
     });
   }
 
-  function handleUpdateQty(productId: string, qty: number) {
-    const product = products.find((p) => p.id === productId);
-    if (!product) return;
-
-    // Cegah memasukkan jumlah melebihi stok asli produk
-    if (qty > product.stock) {
-      alert(`Stok maksimal untuk ${product.name} adalah ${product.stock}`);
-      qty = product.stock;
-    }
-
-    if (qty < 1) return;
-
-    setCartItems((currentItems) =>
-      currentItems.map((item) =>
-        item.productId === productId
-          ? { ...item, qty, subtotal: qty * item.price }
-          : item,
-      ),
+  function updateQuantity(productId: string, delta: number) {
+    setCart((current) =>
+      current
+        .map((item) =>
+          item.productId === productId
+            ? {
+                ...item,
+                quantity: Math.min(
+                  item.stock,
+                  Math.max(0, item.quantity + delta),
+                ),
+              }
+            : item,
+        )
+        .filter((item) => item.quantity > 0),
     );
   }
 
-  function handleRemoveItem(productId: string) {
-    setCartItems((currentItems) =>
-      currentItems.filter((item) => item.productId !== productId),
+  function removeItem(productId: string) {
+    setCart((current) =>
+      current.filter((item) => item.productId !== productId),
     );
   }
 
   async function handleCheckout() {
     if (!user) return;
-    const transactionItems: TransactionItem[] = cartItems.map((item) => ({
-      productId: item.productId,
-      productName: item.name,
-      price: item.price,
-      quantity: item.qty,
-      subtotal: item.subtotal,
-    }));
-    const transactionId = await createTransaction(user.uid, {
-      items: transactionItems,
-      total: grandTotal,
-      paidAmount,
-      paymentMethod,
-    });
-    console.log(transactionId)
-    router.push("/transactions/" + transactionId);
+    setError("");
+
+    if (cart.length === 0) return setError("Keranjang masih kosong.");
+    if (paymentMethod === "cash" && paymentAmount < total)
+      return setError("Uang pembayaran masih kurang");
+
+    try {
+      setSubmitting(true);
+      const result = await checkout(user.uid, {
+        items: cart,
+        paymentMethod,
+        paymentAmount: paymentMethod === "cash" ? paymentAmount : total,
+      });
+      router.push(`/transactions/${result.transactionId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transaksi gagal disimpan");
+      await loadProducts();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  useEffect(() => {
-   
-    async function loadProducts() {
-      try {
-         if (!user) return;
-        setLoading(true);
-
-        const data = await getProducts(user.uid);
-        setProducts(data);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadProducts();
-  }, []);
-
   return (
-    <div className="grid gap-3">
-      <div className="mb-7">
-        <p className="text-sm font-bold text-indigo-600">OVERVIEW</p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight">Kasir</h1>
-        <p className="mt-2 text-sm text-slate-500">------------------------</p>
+    <div>
+      <div className="mb-6">
+        <p className="text-sm font-bold text-indigo-600"> POINT OF SALE</p>
+        <h1 className="mt-1 text-3xl font-black tracking-tight">
+          Transaksi Baru
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Pilih produk, atur jumlah, lalu selesaikan pembayaran
+        </p>
       </div>
-      {/* Search Input */}
-      <Input
-        placeholder="Cari nama atau SKU..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="mb-2 pl-3 max-w-md"
-      />
 
-      {/* List Produk */}
-      {filteredProducts.map((product) => {
-        const availableStock = availableStockMap.get(product.id) ?? 0;
+      <div className="grid gap-6 xl:grid-cols-[1fr_390px]">
+        <section className="min-w-0">
+          <div className="mb-4 max-w-md">
+            <Input
+              placeholder="Cari nama atau SKU.."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          {loading ? (
+            <div className="rounded-2xl bg-white p-8 text-slate-500">
+              Memuat produk ...
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => addToCart(product)}
+                  disabled={product.stock <= 0}
+                  className="rounded-2xl border-slate-200 bg-white p-5 text-left shadow-sm transition hover:translate-y-0.5 hover:border-indigo-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-black text-slate-900">
+                        {product.name}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-400">
+                        {product.sku}
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-bold ${product.stock <= 5 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}
+                    >
+                      {product.stock}
+                    </span>
+                  </div>
+                  <div className="mt-5 text-lg font-black text-indigo-600">
+                    {formatCurrency(product.price)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
 
-        return (
-          <div
-            key={product.id}
-            className="flex items-center justify-between rounded-2xl border bg-white p-4 hover:bg-slate-200"
-          >
+        <aside className="h-fit rounded-3xl bg-slate-950 p-5 text-white shadow-xl xl:sticky xl:top-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-indigo-600">
+              <ShoppingCart size={20} />
+            </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-700">{product.name}</h3>
-                <span className="text-xs font-semibold text-slate-500">
-                  (Sisa: {availableStock})
-                </span>
+              <div className="font-black">Keranjang</div>
+              <div className="text-xs text-slate-400">
+                {cart.length} jenis produk
               </div>
-              <p className="text-sm text-slate-800">
-                {formatRupiah(product.price)}
-              </p>
+            </div>
+          </div>
+          <div className="grid max-h-72 gap-3 overflow-y-auto pr-1">
+            {cart.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">
+                Belum ada produk.
+              </div>
+            )}
+            {cart.map((item) => (
+              <div
+                key={item.productId}
+                className="rounded-2xl bg-slate-900 p-4"
+              >
+                <div className="flex justify-between gap-3">
+                  <div>
+                    <div className="font-bold">{item.name}</div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      {formatCurrency(item.price)} / item
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeItem(item.productId)}
+                    className="text-slate-500 hover:text-rose-400"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateQuantity(item.productId, -1)}
+                      className="grid size-8 place-items-center rounded-lg bg-slate-800"
+                    >
+                      <Minus size={15} />
+                    </button>
+                    <span className="min-w-6 text-center font-black">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() => updateQuantity(item.productId, 1)}
+                      disabled={item.quantity >= item.stock}
+                      className="grid size-8 place-items-center rounded-lg bg-slate-800 disabled:opacity-30"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </div>
+                  <div className="font-black">
+                    {formatCurrency(item.price * item.quantity)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="my-5 border-t border-slate-800" />
+          <div className="flex items-end justify-between">
+            <span className="text-sm text-slate-400">Total</span>
+            <span className="text-2xl font-black">{formatCurrency(total)}</span>
+          </div>
+
+          <div className="mt-5 grid gap-3">
+            <label className="grid gap-2 text-sm font-bold">
+              Metode Pembayaran
+              <select
+                value={paymentMethod}
+                onChange={(e) =>
+                  setPaymentMethod(e.target.value as PaymentMethod)
+                }
+                className="min-h-11 rounded-xl border border-slate-700 bg-slate-900 px-3 text-white outline-none"
+              >
+                <option value="cash">Cash</option>
+                <option value="transfer">Transfer</option>
+                <option value="qris">QRIS</option>
+              </select>
+            </label>
+
+            {paymentMethod === "cash" && (
+              <label className="grid gap-2 text-sm font-bold">
+                Uang Diterima
+                <input
+                  type="number"
+                  min="0"
+                  value={paymentAmount || ""}
+                  onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                  className="min-h-11 rounded-xl border border-slate-700 bg-slate-900 px-3 text-white outline-none"
+                />
+              </label>
+            )}
+
+            <div className="flex justify-between rounded-xl bg-slate-900 p-3 text-sm">
+              <span className="text-slate-400">Kembalian</span>
+              <strong>{formatCurrency(change)}</strong>
             </div>
 
+            {error && (
+              <div className="rounded-xl bg-rose-950 p-3 text-sm font-semibold text-rose-200">
+                {error}
+              </div>
+            )}
             <Button
-              onClick={() => handleAddToCart(product)}
-              disabled={availableStock <= 0}
+              onClick={() => void handleCheckout()}
+              disabled={submitting || cart.length === 0}
+              className="w-full"
             >
-              {availableStock <= 0 ? "Habis" : "Tambah"}
+              {submitting ? "Menyimpan..." : `Bayar ${formatCurrency(total)}`}
             </Button>
           </div>
-        );
-      })}
-
-      {/* Tampilan Keranjang */}
-      {cartItems.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-8 text-center">
-          <ShoppingCart className="mx-auto text-slate-700" />
-
-          <h3 className="mt-4 font-bold">Keranjang masih kosong</h3>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Pilih produk dari daftar di atas.
-          </p>
-        </div>
-      ) : (
-        <div className="text-center font-semibold">Isi Keranjang</div>
-      )}
-
-      {cartItems.map((item) => (
-        <div key={item.productId} className="rounded-2xl border bg-white p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-1 items-center gap-4">
-              <h3 className="font-bold text-slate-700">{item.name}</h3>
-              <p className="text-sm text-slate-900">
-                {formatRupiah(item.price)} x {item.qty}
-              </p>
-            </div>
-            <Input
-              type="number"
-              min={1}
-              value={item.qty}
-              onChange={(event) =>
-                handleUpdateQty(item.productId, Number(event.target.value))
-              }
-              className="flex-1 max-w-xs"
-            />
-
-            <button
-              className="rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 font-semibold cursor-pointer hover:bg-red-200 duration-200"
-              onClick={() => handleRemoveItem(item.productId)}
-            >
-              Hapus
-            </button>
-          </div>
-        </div>
-      ))}
-
-      {/* Ringkasan Total Sebelum Diskon */}
-      <div className="flex items-center justify-between rounded-xl bg-slate-50 p-4 font-semibold">
-        <span className="text-slate-600">Subtotal</span>
-        <span className="text-slate-900">{formatRupiah(subtotal)}</span>
+        </aside>
       </div>
-
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-semibold p-2 rounded-md">Diskon</h1>
-        <Input
-          type="number"
-          min={0}
-          value={discount}
-          onChange={(event) => setDiscount(Number(event.target.value))}
-        />
-      </div>
-
-      <div className="flex justify-between">
-        <p>Metode Pembayaran</p>
-        <select
-          className="text-right text-slate-800 bg-amber-50"
-          value={paymentMethod}
-          onChange={(event) =>
-            setPaymentMethod(event.target.value as PaymentMethod)
-          }
-        >
-          <option value="cash">Cash</option>
-          <option value="transfer">Transfer</option>
-          <option value="qris">QRIS</option>
-        </select>
-      </div>
-
-      <Button
-        type="button"
-        disabled={cartItems.length === 0}
-        onClick={handleCheckout}
-        className="w-full"
-      >
-        Checkout
-      </Button>
     </div>
   );
 }

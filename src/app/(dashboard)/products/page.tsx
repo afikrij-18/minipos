@@ -42,13 +42,9 @@ export default function ProductsPage() {
 
   async function handleDelete(id: string) {
     if (!user) return;
-    
     const confirmed = window.confirm("Yakin ingin menghapis produk ini?");
-
     if (!confirmed) return;
-
     await deleteProduct(user.uid, id);
-
     await loadProducts();
   }
 
